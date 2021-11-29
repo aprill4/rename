@@ -73,28 +73,24 @@ int max_len(int a, int b){
 bool match_filename(const char *old_name, char *filename){
 	char* f = filename;
 	char* o = old_name;
-	while ( *o != '\0')	{
-		while ( *o == *f ){
-			o++;
+	while ( *o == *f ){
+		o++;
+		f++;
+	}
+	if (*o == '\0' && *p == '\0') return 1;
+	if (*o == '\0' && *p != '\0') return 0;
+	if ( *o != '*' ) return 0;
+	o++;
+	while ( *f != '\0' ) {
+		while ( *f != *o ) {
 			f++;
 		}
-		if ( *o != '*' ) return 0;
-		o++;
-		if ( *o != '\0' ) {
-			while ( *f != '\0' ) {
-				while ( *f != *o ) {
-					f++;
-				}
-				if (*f == '\0') return 0;
-				if (strcmp(f, o) == 0) {
-					return 1;
-				}
-				f++;
-		
-			}
+		if (*f == '\0') return 0;
+		if (strcmp(f, o) == 0) {
+			return 1;
 		}
+		f++;
 	}
-	return 1;
 }
 
 void find_files(const char *mydir, const char *old_name){
