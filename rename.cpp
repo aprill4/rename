@@ -77,10 +77,11 @@ bool match_filename(const char *old_name, char *filename){
 		o++;
 		f++;
 	}
-	if (*o == '\0' && *p == '\0') return 1;
-	if (*o == '\0' && *p != '\0') return 0;
+	if (*o == '\0' && *f == '\0') return 1;
+	if (*o == '\0' && *f != '\0') return 0;
 	if ( *o != '*' ) return 0;
 	o++;
+	if (*o == '\0' && *f == '\0') return 1;
 	while ( *f != '\0' ) {
 		while ( *f != *o ) {
 			f++;
