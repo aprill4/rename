@@ -6,12 +6,59 @@
 
 char *filenames[50];
 
-void find_files(const char *old_name){
+struct command{
+	bool force_flag = 0;
+	bool show_help = 0;
+	const char *d = ".";
+	char *old_name;
+	char *new_name;
+};
+
+struct command* parsing_command(int argc, char *argv[]){
+	struct command *tmp = new struct command;
+	
+	if (argc == 1){
+		return NULL;
+	}
+
+	for (int i = 1; i < argc; i++){
+
+		if (strcmp(argv[i], "-h") == 0){
+			tmp->show_help = 1;
+			return tmp;
+		}
+
+		else if (strcmp(argv[i], "-f") == 0){
+			tmp->force_flag = 1;
+		}
+
+		else {
+			tmp->old_name = argv[i];
+
+			if (i+1 < argc){
+				tmp->new_name = argv[i+1];
+				i += 1;
+				printf("old name: %s\n", tmp->old_name);
+				printf("new name: %s\n", tmp->new_name);
+			}
+			else{
+				//TODO: error when no new filename
+				//printf("");
+			}
+		}
+	}
+
+	printf("force_flag %d\n", tmp->force_flag);
+	
+	return tmp;
+}
+
+void find_files(const char *mydir, const char *old_name){
 	DIR *d;
 	struct dirent *dir;
-	d = opendir(".");
+	d = opendir(mydir);
 	if (d){
-		//printf("find files %s\n", old_name);
+
 		int fc = 0;
 
 		while ((dir = readdir(d)) != NULL){
@@ -42,7 +89,6 @@ void rename_files(bool cflag, int len, const char *new_name){
 	}
 } 
 
-//TODO: CONFIRM 
 bool confirm(bool fflag){
 	if (fflag) {
 		return 1;
@@ -56,39 +102,31 @@ bool confirm(bool fflag){
 
 	return 1;
 }
+
+void print_usage(){
+
+	printf("Usage: rename [OPTION]... [OLD_FILENAME] [NEW_FILENAME]\n");
+	printf("Rename old filename to new filename (the current directory by default).\n");
+	printf("\n");
+	printf("only short options.\n");
+	printf("    -f,\tforce to rename\n");
+	printf("    -h,\tdisplay this help and exit\n");
+	printf("can use \"*\" in filename to match any characters.\n");
+}
+
 int main(int argc, char *argv[]){
 
-	bool force_flag = 0;
-	bool show_help = 0;
-	const char *old_name;
-	const char *new_name;
+	struct command *c = parsing_command(argc, argv);
 	
-	for (int i = 1; i < argc; i++){
-
-		if (strcmp(argv[i], "-f") == 0){
-			force_flag = 1;
-		}
-		
-		else if (strcmp(argv[i], "-h") == 0){
-			show_help = 1;
-		}
-
-		else {
-			old_name = argv[i];
-			new_name = argv[i+1];
-			i += 1;
-			printf("old name: %s\n", old_name);
-			printf("new name: %s\n", new_name);
-		}
+	if (!c || c->show_help){
+		print_usage();
+		return 0;
 	}
 
-	printf("force_flag %d\n", force_flag);
-	printf("show_help %d\n", show_help);
+	find_files(c->d, c->old_name);
+	bool cflag = confirm(c->force_flag);
 
-	find_files(old_name);
-	bool cflag = confirm(force_flag);
-
-	rename_files(cflag, 1, new_name);
+	rename_files(cflag, 1, c->new_name);
 
 	return 0;
 }	
