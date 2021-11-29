@@ -1,3 +1,5 @@
+// $ g++ -o # @
+
 #include<unistd.h>
 #include<stdio.h>
 #include<dirent.h>
@@ -18,7 +20,8 @@ struct command* parsing_command(int argc, char *argv[]){
 	struct command *tmp = new struct command;
 	
 	if (argc == 1){
-		return NULL;
+		tmp->show_help = 1;
+		return tmp;
 	}
 
 	for (int i = 1; i < argc; i++){
@@ -118,7 +121,7 @@ int main(int argc, char *argv[]){
 
 	struct command *c = parsing_command(argc, argv);
 	
-	if (!c || c->show_help){
+	if (c->show_help){
 		print_usage();
 		return 0;
 	}
