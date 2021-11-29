@@ -11,6 +11,7 @@ char *filenames[50];
 struct command{
 	bool force_flag = 0;
 	bool show_help = 0;
+	bool error_occurs = 0;
 	const char *d = ".";
 	char *old_name;
 	char *new_name;
@@ -30,11 +31,9 @@ struct command* parsing_command(int argc, char *argv[]){
 			tmp->show_help = 1;
 			return tmp;
 		}
-
 		else if (strcmp(argv[i], "-f") == 0){
 			tmp->force_flag = 1;
 		}
-
 		else {
 			tmp->old_name = argv[i];
 
@@ -45,8 +44,9 @@ struct command* parsing_command(int argc, char *argv[]){
 				printf("new name: %s\n", tmp->new_name);
 			}
 			else{
-				//TODO: error when no new filename
-				//printf("");
+				printf("error, an old name must be followed by a new name\n");
+				error_occurs = 1;
+				return tmp;
 			}
 		}
 	}
@@ -56,6 +56,47 @@ struct command* parsing_command(int argc, char *argv[]){
 	return tmp;
 }
 
+int len(char *str){
+	char *begin = str;
+	int l = 0;
+	while ( begin != '\0'){
+		begin++;
+		l++;
+	}
+	return l;
+}
+
+int max_len(int a, int b){
+	return (a > b) ? a : b;
+}
+//TODO: auto format
+bool match_filename(const char *old_name, char *filename){
+	char* f = filename;
+	char* o = old_name;
+	while ( *o != '\0')	{
+		while ( *o == *f ){
+			o++;
+			f++;
+		}
+		if ( *o != '*' ) return 0;
+		o++;
+		if ( *o != '\0' ) {
+			while ( *f != '\0' ) {
+				while ( *f != *o ) {
+					f++;
+				}
+				if (*f == '\0') return 0;
+				if (strcmp(f, o) == 0) {
+					return 1;
+				}
+				f++;
+		
+			}
+		}
+	}
+	return 1;
+}
+
 void find_files(const char *mydir, const char *old_name){
 	DIR *d;
 	struct dirent *dir;
@@ -63,7 +104,7 @@ void find_files(const char *mydir, const char *old_name){
 	if (d){
 
 		int fc = 0;
-
+		//TODO: when * in filename, compares filename char by char
 		while ((dir = readdir(d)) != NULL){
 			if (strcmp(dir->d_name, old_name) == 0){
 				printf("%s\n", dir->d_name);
@@ -125,7 +166,10 @@ int main(int argc, char *argv[]){
 		print_usage();
 		return 0;
 	}
-
+	else if (c->error_occurs){
+		return 0;
+	}
+	
 	find_files(c->d, c->old_name);
 	bool cflag = confirm(c->force_flag);
 
