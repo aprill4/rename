@@ -44,8 +44,8 @@ struct command* parsing_command(int argc, char *argv[]){
 				printf("new name: %s\n", tmp->new_name);
 			}
 			else{
+				tmp->error_occurs = 1;
 				printf("error, an old name must be followed by a new name\n");
-				error_occurs = 1;
 				return tmp;
 			}
 		}
@@ -59,39 +59,58 @@ struct command* parsing_command(int argc, char *argv[]){
 int len(char *str){
 	char *begin = str;
 	int l = 0;
-	while ( begin != '\0'){
+	while ( *begin != '\0'){
 		begin++;
 		l++;
 	}
 	return l;
 }
 
-int max_len(int a, int b){
-	return (a > b) ? a : b;
-}
 //TODO: auto format
-bool match_filename(const char *old_name, char *filename){
-	char* f = filename;
-	char* o = old_name;
-	while ( *o == *f ){
+bool match_filename(const char *old_name, const char *filename){
+	const char* f = filename;
+	const char* o = old_name;
+
+	while ( *o == *f  && *o != '\0' && *f != '\0'){
 		o++;
 		f++;
 	}
-	if (*o == '\0' && *f == '\0') return 1;
-	if (*o == '\0' && *f != '\0') return 0;
-	if ( *o != '*' ) return 0;
-	o++;
-	if (*o == '\0' && *f == '\0') return 1;
-	while ( *f != '\0' ) {
-		while ( *f != *o ) {
-			f++;
+	
+	if (*o != '\0') {
+		if (*o != '*') return 0;
+		o++;
+		if (*f == '\0' && *o != '\0') return 0;
+		if (*f == '\0' && *o == '\0') return 1;
+		int c = 0;
+		while (*f != '\0') {
+			if (*f == *o && c != 0) {
+				f += 1;
+				if (*f == '\0') return 0;
+				f -= c;
+				o -= c;
+			}
+
+			while (*f != *o && *f != '\0') {
+				f++;
+			}
+			
+			if (*f == '\0' && *o != '\0') return 0;
+			if (*f == '\0' && *o == '\0') return 1;
+
+			c = 0;
+			while (*f == *o && *(f+1) != '\0' && *(o+1) != '\0') {
+				f++;
+				o++;
+				c++;
+			}
+			if (*f == *o && *(f+1) == '\0' && *(o+1) == '\0') {
+				return 1;
+			}
 		}
-		if (*f == '\0') return 0;
-		if (strcmp(f, o) == 0) {
-			return 1;
-		}
-		f++;
+		return 1;
 	}
+	if (*f != '\0') return 0;
+	return 1;
 }
 
 void find_files(const char *mydir, const char *old_name){
@@ -103,7 +122,7 @@ void find_files(const char *mydir, const char *old_name){
 		int fc = 0;
 		//TODO: when * in filename, compares filename char by char
 		while ((dir = readdir(d)) != NULL){
-			if (strcmp(dir->d_name, old_name) == 0){
+			if (match_filename(old_name, dir->d_name)){
 				printf("%s\n", dir->d_name);
 				filenames[fc++] = dir->d_name;
 			}
@@ -166,11 +185,21 @@ int main(int argc, char *argv[]){
 	else if (c->error_occurs){
 		return 0;
 	}
-	
-	find_files(c->d, c->old_name);
-	bool cflag = confirm(c->force_flag);
 
-	rename_files(cflag, 1, c->new_name);
+	char o[20];
+	char f[20];
+
+	/*
+	while (1) {
+		scanf("%s %s", o, f);
+		int tf = match_filename(o, f);
+		printf("%d\n", tf);
+	}
+	*/	
+	find_files(c->d, c->old_name);
+	//bool cflag = confirm(c->force_flag);
+
+	//rename_files(cflag, 1, c->new_name);
 
 	return 0;
 }	
