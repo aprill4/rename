@@ -6,6 +6,7 @@
 #include<string.h>
 #include<sys/types.h>
 
+//struct contains a string and 2 integers for position recording
 char *filenames[50];
 
 struct command{
