@@ -56,15 +56,6 @@ struct command* parsing_command(int argc, char *argv[]){
 	return tmp;
 }
 
-int len(char *str){
-	char *begin = str;
-	int l = 0;
-	while ( *begin != '\0'){
-		begin++;
-		l++;
-	}
-	return l;
-}
 
 //TODO: auto format
 bool match_filename(const char *old_name, const char *filename){
@@ -186,8 +177,6 @@ int main(int argc, char *argv[]){
 		return 0;
 	}
 
-	char o[20];
-	char f[20];
 
 	/*
 	while (1) {
