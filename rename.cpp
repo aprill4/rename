@@ -7,7 +7,11 @@
 #include<sys/types.h>
 
 //struct contains a string and 2 integers for position recording
-char *filenames[50];
+struct file_matched{
+	char *filename;
+	int star_begins = -1; 
+	int star_ends = -1;
+}files_matched[50];
 
 struct command{
 	bool force_flag = 0;
@@ -38,15 +42,14 @@ struct command* parsing_command(int argc, char *argv[]){
 		else {
 			tmp->old_name = argv[i];
 
-			if (i+1 < argc){
+			if (i + 1 < argc && !(i + 2 < argc)){
 				tmp->new_name = argv[i+1];
-				i += 1;
 				printf("old name: %s\n", tmp->old_name);
 				printf("new name: %s\n", tmp->new_name);
 			}
 			else{
 				tmp->error_occurs = 1;
-				printf("error, an old name must be followed by a new name\n");
+				printf("error, options should come before filenames and an old name must be followed by a new name\n");
 				return tmp;
 			}
 		}
@@ -59,35 +62,53 @@ struct command* parsing_command(int argc, char *argv[]){
 
 
 //TODO: auto format
-bool match_filename(const char *old_name, const char *filename){
+struct file_matched* match_filename(const char *old_name, const char *filename){
 	const char* f = filename;
 	const char* o = old_name;
+	struct file_matched *p = new struct file_matched;
 
+	int s = 0;
 	while ( *o == *f  && *o != '\0' && *f != '\0'){
 		o++;
 		f++;
+		s++;
 	}
 	
 	if (*o != '\0') {
-		if (*o != '*') return 0;
+		if (*o != '*') {
+			return NULL;
+		}
+
 		o++;
-		if (*f == '\0' && *o != '\0') return 0;
-		if (*f == '\0' && *o == '\0') return 1;
+
+		if (*f == '\0' && *o != '\0') return NULL;
+		if (*f == '\0' && *o == '\0') {
+			p -> filename = filename;
+		}
 		int c = 0;
+		int e = 0;
 		while (*f != '\0') {
-			if (*f == *o && c != 0) {
-				f += 1;
-				if (*f == '\0') return 0;
-				f -= c;
+			if (c > 0){
+				if (*f == *o) {
+					f += 1;
+					if (*f == '\0') return NULL;
+					f -= c;
+				}
 				o -= c;
 			}
 
 			while (*f != *o && *f != '\0') {
 				f++;
+				e++;
 			}
 			
-			if (*f == '\0' && *o != '\0') return 0;
-			if (*f == '\0' && *o == '\0') return 1;
+			if (*f == '\0' && *o != '\0') return NULL;
+			if (*f == '\0' && *o == '\0') {
+			// assign values to star_begins and star_ends 
+				p -> filename = filename;	
+				p -> star_begins = s + 1; 
+				// p -> star_ends = -1, means starts at s+1 until string ends
+			}
 
 			c = 0;
 			while (*f == *o && *(f+1) != '\0' && *(o+1) != '\0') {
@@ -102,6 +123,7 @@ bool match_filename(const char *old_name, const char *filename){
 		return 1;
 	}
 	if (*f != '\0') return 0;
+	p -> filename = filename;
 	return 1;
 }
 
@@ -130,6 +152,7 @@ void find_files(const char *mydir, const char *old_name){
 
 void rename_files(bool cflag, int len, const char *new_name){
 	if (!cflag) return;
+	// check if many files matched, but new_name has no star
 	for (int i = 0; i < len; i++){
 		int r = rename((const char *)filenames[i], new_name);
 		if (r != 0) {
@@ -163,7 +186,7 @@ void print_usage(){
 	printf("only short options.\n");
 	printf("    -f,\tforce to rename\n");
 	printf("    -h,\tdisplay this help and exit\n");
-	printf("can use \"*\" in filename to match any characters.\n");
+	printf("can use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename!\n");
 }
 
 int main(int argc, char *argv[]){
