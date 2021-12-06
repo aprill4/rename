@@ -13,6 +13,8 @@ struct file_matched{
 	int star_ends = -1;
 }files_matched[50];
 
+int fc = 0;
+
 struct command{
 	bool force_flag = 0;
 	bool show_help = 0;
@@ -38,14 +40,14 @@ struct command* parsing_command(int argc, char *argv[]){
 		}
 		else if (strcmp(argv[i], "-f") == 0){
 			tmp->force_flag = 1;
+			continue;
 		}
 		else {
 			tmp->old_name = argv[i];
 
-			if (i + 1 < argc && !(i + 2 < argc)){
+			if (i + 1 < argc) {
 				tmp->new_name = argv[i+1];
-				printf("old name: %s\n", tmp->old_name);
-				printf("new name: %s\n", tmp->new_name);
+				i++;
 			}
 			else{
 				tmp->error_occurs = 1;
@@ -55,7 +57,6 @@ struct command* parsing_command(int argc, char *argv[]){
 		}
 	}
 
-	printf("force_flag %d\n", tmp->force_flag);
 	
 	return tmp;
 }
@@ -84,11 +85,12 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 		if (*f == '\0' && *o != '\0') return NULL;
 		if (*f == '\0' && *o == '\0') {
 			p -> filename = filename; 
+			p -> star_begins = s;
 			// star_begins = -1 and star_ends = -1
 			// which means each character of the filename was matched with the specified pattern
 		}
 		int c = 0;
-		int e = s;
+		int e = 0;
 		while (*f != '\0') {
 			if (c > 0){
 				if (*f == *o) {
@@ -123,7 +125,7 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 			if (*f == *o && *(f+1) == '\0' && *(o+1) == '\0') {
 				p -> filename = filename;
 				p -> star_begins = (s == 0) ? -1 : s; 
-				p -> star_ends = e - 1;
+				p -> star_ends = e;
 				//printf("filename: %s, star_begins: %d, star_ends: %d\n", p->filename, p->star_begins, p->star_ends);
 				return p;
 			}
@@ -138,14 +140,14 @@ void find_files(const char *mydir, const char *old_name){
 	DIR *d;
 	struct dirent *dir;
 	d = opendir(mydir);
-	if (d){
 
-		int fc = 0;
-		file_matched *fm = new file_matched;
-		//TODO: when * in filename, compares filename char by char
+	if (d){
+		struct file_matched *fm = new file_matched;
+
 		while ((dir = readdir(d)) != NULL){
-			if (fm = match_filename(old_name, dir->d_name) != NULL){
-				printf("%s\n", dir->d_name);
+			fm = match_filename(old_name, dir->d_name);
+			if (fm != NULL){
+				printf("%s\n", fm->filename);
 				files_matched[fc++] = *fm;
 			}
 		}
@@ -158,11 +160,59 @@ void find_files(const char *mydir, const char *old_name){
 	}
 }
 
+char *construct_new_name(file_matched fm, const char *new_name){
+
+	const char *c = new_name;
+	int s = 0;
+	int e = 0;
+	while (*c != '\0'){
+		if (*c == '*'){
+			e = s;
+			break;
+		}
+		else{
+			c++;
+			s++;
+		}
+	}
+	int star_begins = fm.star_begins;
+	star_begins = (star_begins == -1) ? 0 : star_begins;
+	int star_ends = fm.star_ends;
+
+	const char *star = fm.filename + star_begins;
+	char *c_new_name = new char[30];
+	char *t = c_new_name;
+	int i = 0;
+	while (i < s){
+		*t++ = *new_name++;
+		i++;
+	}
+
+	if (e != 0){
+		if (star_ends != -1){
+			while (star_ends--){
+				*t++ = *star++;
+			}
+		}
+		else{
+			while (*star != '\0'){
+				*t++ = *star++;
+			}
+		}
+		const char *after_star = new_name + 1;
+		while (*after_star != '\0'){
+			*t++ = *after_star++;
+		}
+	}
+	*t= '\0';
+	return c_new_name;
+}
+
 void rename_files(bool cflag, int len, const char *new_name){
 	if (!cflag) return;
 	for (int i = 0; i < len; i++){
-
-		int r = rename((const char *)files_matched[i], new_name);
+		const char *c_new_name = construct_new_name(files_matched[i], new_name);
+		int r = rename((const char *)files_matched[i].filename, c_new_name);
 		if (r != 0) {
 			printf("failed to rename %s\n", files_matched[i].filename);
 		}
@@ -198,7 +248,7 @@ void print_usage(){
 }
 
 int main(int argc, char *argv[]){
-	/*
+	///*
 	struct command *c = parsing_command(argc, argv);
 	
 	if (c->show_help){
@@ -208,9 +258,9 @@ int main(int argc, char *argv[]){
 	else if (c->error_occurs){
 		return 0;
 	}
-	*/
+	//*/
 
-	///*
+	/*
 	char o[20];
 	char f[20];
 
@@ -220,16 +270,17 @@ int main(int argc, char *argv[]){
 		fm = match_filename(o, f);
 		if (fm != NULL){
 			printf("file matched: name: %s, star_begins: %d, star_ends: %d\n", fm->filename, fm->star_begins, fm->star_ends);
+			files_matched[0] = *fm;
 		}
 		else{
 			printf("no matched files\n");
 		}
 	}
-	//*/	
-	//find_files(c->d, c->old_name);
-	//bool cflag = confirm(c->force_flag);
+	*/	
+	find_files(c->d, c->old_name);
+	bool cflag = confirm(c->force_flag);
 
-	//rename_files(cflag, 1, c->new_name);
+	rename_files(cflag, fc, c->new_name);
 
 	return 0;
 }	
