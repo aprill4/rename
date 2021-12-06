@@ -1,4 +1,4 @@
-// $ g++ -o # @
+// $ g++ -o # @ -g
 
 #include<unistd.h>
 #include<stdio.h>
@@ -8,7 +8,7 @@
 
 //struct contains a string and 2 integers for position recording
 struct file_matched{
-	char *filename;
+	const char *filename;
 	int star_begins = -1; 
 	int star_ends = -1;
 }files_matched[50];
@@ -83,10 +83,12 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 
 		if (*f == '\0' && *o != '\0') return NULL;
 		if (*f == '\0' && *o == '\0') {
-			p -> filename = filename;
+			p -> filename = filename; 
+			// star_begins = -1 and star_ends = -1
+			// which means each character of the filename was matched with the specified pattern
 		}
 		int c = 0;
-		int e = 0;
+		int e = s;
 		while (*f != '\0') {
 			if (c > 0){
 				if (*f == *o) {
@@ -95,6 +97,7 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 					f -= c;
 				}
 				o -= c;
+				e += c;
 			}
 
 			while (*f != *o && *f != '\0') {
@@ -104,10 +107,11 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 			
 			if (*f == '\0' && *o != '\0') return NULL;
 			if (*f == '\0' && *o == '\0') {
-			// assign values to star_begins and star_ends 
 				p -> filename = filename;	
-				p -> star_begins = s + 1; 
-				// p -> star_ends = -1, means starts at s+1 until string ends
+				p -> star_begins = (s == 0) ? -1 : s; 
+				//printf("filename: %s, star_begins: %d\n", p->filename, p->star_begins);
+				// p -> star_ends = -1, which means star starts at s until string ends
+				return p;
 			}
 
 			c = 0;
@@ -117,14 +121,17 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 				c++;
 			}
 			if (*f == *o && *(f+1) == '\0' && *(o+1) == '\0') {
-				return 1;
+				p -> filename = filename;
+				p -> star_begins = (s == 0) ? -1 : s; 
+				p -> star_ends = e - 1;
+				//printf("filename: %s, star_begins: %d, star_ends: %d\n", p->filename, p->star_begins, p->star_ends);
+				return p;
 			}
 		}
-		return 1;
 	}
-	if (*f != '\0') return 0;
+	if (*f != '\0') return NULL;
 	p -> filename = filename;
-	return 1;
+	return p;
 }
 
 void find_files(const char *mydir, const char *old_name){
@@ -134,11 +141,12 @@ void find_files(const char *mydir, const char *old_name){
 	if (d){
 
 		int fc = 0;
+		file_matched *fm = new file_matched;
 		//TODO: when * in filename, compares filename char by char
 		while ((dir = readdir(d)) != NULL){
-			if (match_filename(old_name, dir->d_name)){
+			if (fm = match_filename(old_name, dir->d_name) != NULL){
 				printf("%s\n", dir->d_name);
-				filenames[fc++] = dir->d_name;
+				files_matched[fc++] = *fm;
 			}
 		}
 		if (fc == 0){
@@ -152,14 +160,14 @@ void find_files(const char *mydir, const char *old_name){
 
 void rename_files(bool cflag, int len, const char *new_name){
 	if (!cflag) return;
-	// check if many files matched, but new_name has no star
 	for (int i = 0; i < len; i++){
-		int r = rename((const char *)filenames[i], new_name);
+
+		int r = rename((const char *)files_matched[i], new_name);
 		if (r != 0) {
-			printf("failed to rename %s\n", filenames[i]);
+			printf("failed to rename %s\n", files_matched[i].filename);
 		}
 		else {
-			printf("renamed %s successfully\n", filenames[i]);
+			printf("renamed %s successfully\n", files_matched[i].filename);
 		}
 	}
 } 
@@ -190,7 +198,7 @@ void print_usage(){
 }
 
 int main(int argc, char *argv[]){
-
+	/*
 	struct command *c = parsing_command(argc, argv);
 	
 	if (c->show_help){
@@ -200,16 +208,25 @@ int main(int argc, char *argv[]){
 	else if (c->error_occurs){
 		return 0;
 	}
+	*/
 
+	///*
+	char o[20];
+	char f[20];
 
-	/*
+	file_matched *fm = new file_matched;
 	while (1) {
 		scanf("%s %s", o, f);
-		int tf = match_filename(o, f);
-		printf("%d\n", tf);
+		fm = match_filename(o, f);
+		if (fm != NULL){
+			printf("file matched: name: %s, star_begins: %d, star_ends: %d\n", fm->filename, fm->star_begins, fm->star_ends);
+		}
+		else{
+			printf("no matched files\n");
+		}
 	}
-	*/	
-	find_files(c->d, c->old_name);
+	//*/	
+	//find_files(c->d, c->old_name);
 	//bool cflag = confirm(c->force_flag);
 
 	//rename_files(cflag, 1, c->new_name);
