@@ -19,10 +19,21 @@ struct command{
 	bool force_flag = 0;
 	bool show_help = 0;
 	bool error_occurs = 0;
-	const char *d = ".";
+	const char *d = "."; //TODO: would support specified directory
 	char *old_name;
 	char *new_name;
 };
+
+void print_usage(){
+
+	printf("Usage: rename [OPTION]... [OLD_FILENAME] [NEW_FILENAME]\n");
+	printf("Rename old filename to new filename (the current directory by default).\n");
+	printf("\n");
+	printf("only short options.\n");
+	printf("    -f,\tforce to rename\n");
+	printf("    -h,\tdisplay this help and exit\n");
+	printf("can use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename!\n");
+}
 
 struct command* parsing_command(int argc, char *argv[]){
 	struct command *tmp = new struct command;
@@ -42,6 +53,11 @@ struct command* parsing_command(int argc, char *argv[]){
 			tmp->force_flag = 1;
 			continue;
 		}
+		else if (strcmp(argv[i], "-d") == 0){
+			tmp->d = argv[i+1];
+			i++;
+			continue;
+		}
 		else {
 			tmp->old_name = argv[i];
 
@@ -51,7 +67,7 @@ struct command* parsing_command(int argc, char *argv[]){
 			}
 			else{
 				tmp->error_occurs = 1;
-				printf("error, options should come before filenames and an old name must be followed by a new name\n");
+				printf("error, an old name must be followed by a new name\n");
 				return tmp;
 			}
 		}
@@ -146,16 +162,19 @@ void find_files(const char *mydir, const char *old_name){
 
 		while ((dir = readdir(d)) != NULL){
 			fm = match_filename(old_name, dir->d_name);
+			//printf("find files: %s\n", dir->d_name);
+			///*
 			if (fm != NULL){
 				printf("%s\n", fm->filename);
 				files_matched[fc++] = *fm;
 			}
+			//*/
 		}
 		if (fc == 0){
 			printf("no such files\n");
 		}
 		else{
-			printf("found %d files as above\n", fc);
+			printf("found %d files as above\n", fc); //TODO:if fc == 1, file
 		}
 	}
 }
@@ -208,19 +227,22 @@ char *construct_new_name(file_matched fm, const char *new_name){
 	return c_new_name;
 }
 
-void rename_files(bool cflag, int len, const char *new_name){
-	if (!cflag) return;
-	for (int i = 0; i < len; i++){
-		const char *c_new_name = construct_new_name(files_matched[i], new_name);
-		int r = rename((const char *)files_matched[i].filename, c_new_name);
-		if (r != 0) {
-			printf("failed to rename %s\n", files_matched[i].filename);
-		}
-		else {
-			printf("renamed %s successfully\n", files_matched[i].filename);
-		}
+void preview(command *cmd){
+
+	printf("These changes would happen\n");
+	for (int i = 0; i < fc; i++){
+		const char *c_new_name = construct_new_name(files_matched[i], cmd->new_name);
+		/*
+		printf("new_name: %s\n", c_new_name);
+		char *d = strcat((char *)cmd->d, "/");
+		printf("d: %s\n", d);
+		*/
+		const char *final_filename = files_matched[i].filename; 
+		const char *final_new_name = c_new_name; 
+
+		printf("%s -> %s\n", final_filename, final_new_name);
 	}
-} 
+}
 
 bool confirm(bool fflag){
 	if (fflag) {
@@ -236,16 +258,33 @@ bool confirm(bool fflag){
 	return 1;
 }
 
-void print_usage(){
+void rename_files(bool cflag, command *cmd){
+	if (!cflag) return;
 
-	printf("Usage: rename [OPTION]... [OLD_FILENAME] [NEW_FILENAME]\n");
-	printf("Rename old filename to new filename (the current directory by default).\n");
-	printf("\n");
-	printf("only short options.\n");
-	printf("    -f,\tforce to rename\n");
-	printf("    -h,\tdisplay this help and exit\n");
-	printf("can use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename!\n");
-}
+	for (int i = 0; i < fc; i++){
+		const char *c_new_name = construct_new_name(files_matched[i], cmd->new_name);
+		/*
+		printf("new_name: %s\n", c_new_name);
+		char *d = strcat((char *)cmd->d, "/");
+		printf("d: %s\n", d);
+		*/
+		const char *final_filename = files_matched[i].filename; 
+		const char *final_new_name = c_new_name; 
+		/*
+		printf("filename: %s\n", files_matched[i].filename);
+		printf("final_new_name: %s\n", final_new_name);
+		printf("final_filename: %s\n", final_filename);
+		*/
+
+		int r = rename(final_filename, final_new_name);
+		if (r != 0) {
+			printf("failed to rename %s\n", files_matched[i].filename);
+		}
+		else {
+			printf("renamed %s successfully\n", files_matched[i].filename);
+		}
+	}
+} 
 
 int main(int argc, char *argv[]){
 	///*
@@ -278,9 +317,10 @@ int main(int argc, char *argv[]){
 	}
 	*/	
 	find_files(c->d, c->old_name);
+	preview(c);
 	bool cflag = confirm(c->force_flag);
 
-	rename_files(cflag, fc, c->new_name);
+	rename_files(cflag, c);
 
 	return 0;
 }	
