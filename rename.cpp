@@ -1,4 +1,5 @@
 // $ g++ -o # @
+//TODO: hope it can rename files with more stars
 
 #include<unistd.h>
 #include<stdio.h>
