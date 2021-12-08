@@ -21,8 +21,8 @@ struct command{
 	bool show_help = 0;
 	bool error_occurs = 0;
 	const char *d = "."; 
-	char *old_name;
-	char *new_name;
+	char *old_name = NULL;
+	char *new_name = NULL;
 };
 
 void print_usage(){
@@ -85,7 +85,11 @@ struct command* parsing_command(int argc, char *argv[]){
 			}
 		}
 	}
-	
+
+	if (tmp->old_name == NULL || tmp->new_name == NULL){
+		tmp -> show_help = 1;
+		return tmp;
+	}
 	return tmp;
 }
 
