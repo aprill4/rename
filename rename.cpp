@@ -33,7 +33,8 @@ void print_usage(){
 	printf("    -f,\tforce to rename\n");
 	printf("    -d,\tspecify a directory, must be followed by a directory name\n");
 	printf("    -h,\tdisplay this help and exit\n");
-	printf("can use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename!\n");
+
+	printf("\ncan use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename!\n");
 }
 
 struct command* parsing_command(int argc, char *argv[]){
@@ -55,9 +56,19 @@ struct command* parsing_command(int argc, char *argv[]){
 			continue;
 		}
 		else if (strcmp(argv[i], "-d") == 0){
-			tmp->d = argv[i+1];
-			i++;
-			continue;
+			if (!(i + 1 < argc)){
+				tmp->show_help = 1;
+				return tmp;
+			}
+			else if(!strcmp(argv[i+1], "-f") || !strcmp(argv[i+1], "-h")){
+					tmp->show_help = 1;
+					return tmp;
+			}
+			else{ 
+				tmp->d = argv[i+1];
+				i++;
+				continue;
+			}
 		}
 		else {
 			tmp->old_name = argv[i];
@@ -77,7 +88,6 @@ struct command* parsing_command(int argc, char *argv[]){
 	
 	return tmp;
 }
-
 
 //TODO: auto format
 struct file_matched* match_filename(const char *old_name, const char *filename){
@@ -170,11 +180,14 @@ void find_files(const char *mydir, const char *old_name){
 			}
 		}
 		if (fc == 0){
-			printf("no such files\n");
+			printf("No such files\n");
 		}
 		else{
-			printf("found %d files as above\n", fc); //TODO:if fc == 1, file
+			printf("Found %d files as above\n", fc); //TODO:if fc == 1, file
 		}
+	}
+	else{
+		printf("No such directory.\n");
 	}
 }
 
@@ -246,6 +259,7 @@ void preview(command *cmd){
 }
 
 bool confirm(bool fflag){
+	if (fc == 0) return 0;
 	if (fflag) {
 		return 1;
 	}
