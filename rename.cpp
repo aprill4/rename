@@ -29,8 +29,9 @@ void print_usage(){
 	printf("Usage: rename [OPTION]... [OLD_FILENAME] [NEW_FILENAME]\n");
 	printf("Rename old filename to new filename (the current directory by default).\n");
 	printf("\n");
-	printf("only short options.\n");
+	printf("Options:\n");
 	printf("    -f,\tforce to rename\n");
+	printf("    -d,\tspecify a directory, must be followed by a directory name\n");
 	printf("    -h,\tdisplay this help and exit\n");
 	printf("can use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename!\n");
 }
@@ -163,12 +164,10 @@ void find_files(const char *mydir, const char *old_name){
 		while ((dir = readdir(d)) != NULL){
 			fm = match_filename(old_name, dir->d_name);
 			//printf("find files: %s\n", dir->d_name);
-			///*
 			if (fm != NULL){
 				printf("%s\n", fm->filename);
 				files_matched[fc++] = *fm;
 			}
-			//*/
 		}
 		if (fc == 0){
 			printf("no such files\n");
@@ -229,6 +228,8 @@ char *construct_new_name(file_matched fm, const char *new_name){
 
 void preview(command *cmd){
 
+	if (fc == 0) return;
+
 	printf("These changes would happen\n");
 	for (int i = 0; i < fc; i++){
 		const char *c_new_name = construct_new_name(files_matched[i], cmd->new_name);
@@ -261,20 +262,28 @@ bool confirm(bool fflag){
 void rename_files(bool cflag, command *cmd){
 	if (!cflag) return;
 
+	char *d = (char *)cmd->d;
+	char *path = new char[100];
+	path = strcpy(path, d);
+
+	while (*(d + 1)){ d++; }
+	if (*d != '/'){
+		path = strcat(path, "/");
+	}
+
 	for (int i = 0; i < fc; i++){
 		const char *c_new_name = construct_new_name(files_matched[i], cmd->new_name);
-		/*
-		printf("new_name: %s\n", c_new_name);
-		char *d = strcat((char *)cmd->d, "/");
-		printf("d: %s\n", d);
-		*/
-		const char *final_filename = files_matched[i].filename; 
-		const char *final_new_name = c_new_name; 
-		/*
-		printf("filename: %s\n", files_matched[i].filename);
-		printf("final_new_name: %s\n", final_new_name);
-		printf("final_filename: %s\n", final_filename);
-		*/
+
+		char *path_new_name = new char[100];
+		path_new_name = strcpy(path_new_name, path);
+		char *path_old_name = new char[100];
+		path_old_name = strcpy(path_old_name, path);
+
+		const char *final_filename = strcat(path_old_name, files_matched[i].filename);
+		const char *final_new_name = strcat(path_new_name, c_new_name);
+
+		//printf("final_new_name: %s\n", final_new_name);
+		//printf("final_filename: %s\n", final_filename);
 
 		int r = rename(final_filename, final_new_name);
 		if (r != 0) {
@@ -283,6 +292,8 @@ void rename_files(bool cflag, command *cmd){
 		else {
 			printf("renamed %s successfully\n", files_matched[i].filename);
 		}
+		delete []path_new_name;
+		delete []path_old_name;
 	}
 } 
 
