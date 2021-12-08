@@ -1,4 +1,4 @@
-// $ g++ -o # @ -g
+// $ g++ -o # @
 
 #include<unistd.h>
 #include<stdio.h>
@@ -19,7 +19,7 @@ struct command{
 	bool force_flag = 0;
 	bool show_help = 0;
 	bool error_occurs = 0;
-	const char *d = "."; //TODO: would support specified directory
+	const char *d = "."; 
 	char *old_name;
 	char *new_name;
 };
@@ -34,7 +34,7 @@ void print_usage(){
 	printf("    -d,\tspecify a directory, must be followed by a directory name\n");
 	printf("    -h,\tdisplay this help and exit\n");
 
-	printf("\ncan use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename!\n");
+	printf("\nHINT:\ncan use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename and only one star can be matched.\n");
 }
 
 struct command* parsing_command(int argc, char *argv[]){
@@ -84,12 +84,10 @@ struct command* parsing_command(int argc, char *argv[]){
 			}
 		}
 	}
-
 	
 	return tmp;
 }
 
-//TODO: auto format
 struct file_matched* match_filename(const char *old_name, const char *filename){
 	const char* f = filename;
 	const char* o = old_name;
@@ -138,8 +136,6 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 			if (*f == '\0' && *o == '\0') {
 				p -> filename = filename;	
 				p -> star_begins = (s == 0) ? -1 : s; 
-				//printf("filename: %s, star_begins: %d\n", p->filename, p->star_begins);
-				// p -> star_ends = -1, which means star starts at s until string ends
 				return p;
 			}
 
@@ -153,7 +149,6 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 				p -> filename = filename;
 				p -> star_begins = (s == 0) ? -1 : s; 
 				p -> star_ends = e;
-				//printf("filename: %s, star_begins: %d, star_ends: %d\n", p->filename, p->star_begins, p->star_ends);
 				return p;
 			}
 		}
@@ -173,7 +168,6 @@ void find_files(const char *mydir, const char *old_name){
 
 		while ((dir = readdir(d)) != NULL){
 			fm = match_filename(old_name, dir->d_name);
-			//printf("find files: %s\n", dir->d_name);
 			if (fm != NULL){
 				printf("%s\n", fm->filename);
 				files_matched[fc++] = *fm;
@@ -183,8 +177,11 @@ void find_files(const char *mydir, const char *old_name){
 			printf("No such files\n");
 		}
 		else{
-			printf("Found %d files as above\n", fc); //TODO:if fc == 1, file
+			printf("Found ");
+			fc > 1 ? printf("%d files", fc) : printf("1 file");
+			printf(" as above\n");
 		}
+		delete fm;
 	}
 	else{
 		printf("No such directory.\n");
@@ -246,11 +243,7 @@ void preview(command *cmd){
 	printf("These changes would happen\n");
 	for (int i = 0; i < fc; i++){
 		const char *c_new_name = construct_new_name(files_matched[i], cmd->new_name);
-		/*
-		printf("new_name: %s\n", c_new_name);
-		char *d = strcat((char *)cmd->d, "/");
-		printf("d: %s\n", d);
-		*/
+
 		const char *final_filename = files_matched[i].filename; 
 		const char *final_new_name = c_new_name; 
 
@@ -260,9 +253,7 @@ void preview(command *cmd){
 
 bool confirm(bool fflag){
 	if (fc == 0) return 0;
-	if (fflag) {
-		return 1;
-	}
+	if (fflag)  return 1;
 	printf("do you want to rename all of these files? (y/n) ");
 
 	char confirm_flag;
@@ -296,9 +287,6 @@ void rename_files(bool cflag, command *cmd){
 		const char *final_filename = strcat(path_old_name, files_matched[i].filename);
 		const char *final_new_name = strcat(path_new_name, c_new_name);
 
-		//printf("final_new_name: %s\n", final_new_name);
-		//printf("final_filename: %s\n", final_filename);
-
 		int r = rename(final_filename, final_new_name);
 		if (r != 0) {
 			printf("failed to rename %s\n", files_matched[i].filename);
@@ -309,6 +297,7 @@ void rename_files(bool cflag, command *cmd){
 		delete []path_new_name;
 		delete []path_old_name;
 	}
+	delete []path;
 } 
 
 int main(int argc, char *argv[]){
