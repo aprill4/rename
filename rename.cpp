@@ -1,4 +1,4 @@
-// $ g++ -o # @
+// $ g++ -o # @ -std=c++11
 //TODO: hope it can rename files with more stars
 
 #include<unistd.h>
@@ -6,13 +6,15 @@
 #include<dirent.h>
 #include<string.h>
 #include<sys/types.h>
+#include<map>
+#include<stack>
 
 //struct contains a string and 2 integers for position recording
-struct file_matched{
+struct FileMacthed{
 	const char *filename;
 	int star_begins = -1; 
 	int star_ends = -1;
-}files_matched[50];
+} files_matched[50];
 
 int fc = 0;
 
@@ -93,10 +95,11 @@ struct command* parsing_command(int argc, char *argv[]){
 	return tmp;
 }
 
-struct file_matched* match_filename(const char *old_name, const char *filename){
+// old silly method of matching files
+struct FileMacthed* match_filename(const char *old_name, const char *filename){
 	const char* f = filename;
 	const char* o = old_name;
-	struct file_matched *p = new struct file_matched;
+	struct FileMacthed *p = new struct FileMacthed;
 
 	int s = 0;
 	while ( *o == *f  && *o != '\0' && *f != '\0'){
@@ -163,13 +166,110 @@ struct file_matched* match_filename(const char *old_name, const char *filename){
 	return p;
 }
 
+// A new and efficient algorithm based on CLR(1) to match files
+// S'->S
+// S->ABC
+// A->a|epsilon
+// B->bB|epsilon
+// C->c|epsilon
+
+// Parsing table
+class Item {
+public:
+    enum Tag{ NoTag, Accept, Shift, Reduce, GoTo };
+    Tag tag = NoTag;
+
+    int no;
+
+    Item(Tag t, int n): tag(t), no(n) {}
+    Item(Tag t): tag(t) { no = -1;}
+};
+
+
+void init_parsing_table(std::map<char, std::map<char, Item*> > &parsing_table) {
+
+    Item *S3 = new Item(Item::Tag::Shift, 3);
+    Item *S5 = new Item(Item::Tag::Shift, 5);
+    Item *S7 = new Item(Item::Tag::Shift, 7);
+
+    Item *R2 = new Item(Item::Tag::Reduce, 2);
+    Item *R3 = new Item(Item::Tag::Reduce, 3);
+    Item *R4 = new Item(Item::Tag::Reduce, 4);
+    Item *R5 = new Item(Item::Tag::Reduce, 5);
+    Item *R6 = new Item(Item::Tag::Reduce, 6);
+    Item *R7 = new Item(Item::Tag::Reduce, 7);
+    Item *R8 = new Item(Item::Tag::Reduce, 8);
+
+    Item *accept = new Item(Item::Tag::Accept);
+
+    Item *goto1 = new Item(Item::Tag::GoTo, 1);
+    Item *goto2 = new Item(Item::Tag::GoTo, 2);
+    Item *goto4 = new Item(Item::Tag::GoTo, 4);
+    Item *goto6 = new Item(Item::Tag::GoTo, 6);
+    Item *goto8 = new Item(Item::Tag::GoTo, 8);
+
+    // I0
+    parsing_table['0']['a'] = S3;
+    parsing_table['0']['b'] = R4;
+    parsing_table['0']['c'] = R4;
+    parsing_table['0']['$'] = R4;
+    parsing_table['0']['S'] = goto1;
+    parsing_table['0']['A'] = goto2;
+
+    //I1
+    parsing_table['1']['$'] = accept;
+
+    //I2
+    parsing_table['2']['b'] = S5;
+    parsing_table['2']['c'] = R6;
+    parsing_table['2']['$'] = R6;
+    parsing_table['2']['B'] = goto4;
+
+    //I3
+    parsing_table['3']['b'] = R3;
+    parsing_table['3']['c'] = R3;
+    parsing_table['3']['$'] = R3;
+
+    //I4
+    parsing_table['4']['c'] = S7;
+    parsing_table['4']['$'] = R8;
+    parsing_table['4']['C'] = goto6;
+
+    //I5
+    parsing_table['5']['b'] = S5;
+    parsing_table['5']['c'] = R6;
+    parsing_table['5']['$'] = R6;
+    parsing_table['5']['B'] = goto8;
+
+    //I6
+    parsing_table['6']['$'] = R2;
+
+    //I7
+    parsing_table['7']['$'] = R7;
+
+    //I8
+    parsing_table['8']['c'] = R5;
+    parsing_table['8']['$'] = R5;
+    
+    // [0, s_T] -> R4(3, 4)
+    // printf("[0,$]: %c, %c\n", parsing_table['0']['$']->tag, parsing_table['0']['$']->no);
+}
+
+struct file_macthed* matching_files(const char *filename, const std::map<int, std::map<int, Item*> >, const char *a, const char *c) {
+
+    char *cur_char = filename;
+    struct FileMacthed *matched_file = new struct FileMatched;
+
+    //std::stack<char> 
+}
+
 void find_files(const char *mydir, const char *old_name){
 	DIR *d;
 	struct dirent *dir;
 	d = opendir(mydir);
 
 	if (d){
-		struct file_matched *fm = new file_matched;
+		struct FileMacthed *fm = new FileMacthed;
 
 		while ((dir = readdir(d)) != NULL){
 			fm = match_filename(old_name, dir->d_name);
@@ -193,7 +293,7 @@ void find_files(const char *mydir, const char *old_name){
 	}
 }
 
-char *construct_new_name(file_matched fm, const char *new_name){
+char *construct_new_name(FileMacthed fm, const char *new_name){
 
 	const char *c = new_name;
 	int s = 0;
@@ -306,7 +406,8 @@ void rename_files(bool cflag, command *cmd){
 } 
 
 int main(int argc, char *argv[]){
-	///*
+
+    /*
 	struct command *c = parsing_command(argc, argv);
 	
 	if (c->show_help){
@@ -316,13 +417,11 @@ int main(int argc, char *argv[]){
 	else if (c->error_occurs){
 		return 0;
 	}
-	//*/
 
-	/*
 	char o[20];
 	char f[20];
 
-	file_matched *fm = new file_matched;
+	FileMacthed *fm = new FileMacthed;
 	while (1) {
 		scanf("%s %s", o, f);
 		fm = match_filename(o, f);
@@ -334,12 +433,16 @@ int main(int argc, char *argv[]){
 			printf("no matched files\n");
 		}
 	}
-	*/	
+
 	find_files(c->d, c->old_name);
 	preview(c);
 	bool cflag = confirm(c->force_flag);
 
 	rename_files(cflag, c);
+    */
+
+    std::map<char, std::map<char, Item*> > parsing_table;
+    init_parsing_table(parsing_table);
 
 	return 0;
 }	
