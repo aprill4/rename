@@ -1,4 +1,4 @@
-// $ g++ -o # @ -std=c++11
+// $ clang++ -o # @ -std=c++11 -g
 //TODO: hope it can rename files with more stars
 
 #include<unistd.h>
@@ -10,7 +10,7 @@
 #include<stack>
 
 //struct contains a string and 2 integers for position recording
-struct FileMacthed{
+struct FileMatched{
 	const char *filename;
 	int star_begins = -1; 
 	int star_ends = -1;
@@ -96,10 +96,10 @@ struct command* parsing_command(int argc, char *argv[]){
 }
 
 // old silly method of matching files
-struct FileMacthed* match_filename(const char *old_name, const char *filename){
+struct FileMatched* match_filename(const char *old_name, const char *filename){
 	const char* f = filename;
 	const char* o = old_name;
-	struct FileMacthed *p = new struct FileMacthed;
+	struct FileMatched *p = new struct FileMatched;
 
 	int s = 0;
 	while ( *o == *f  && *o != '\0' && *f != '\0'){
@@ -176,37 +176,59 @@ struct FileMacthed* match_filename(const char *old_name, const char *filename){
 // Parsing table
 class Item {
 public:
-    enum Tag{ NoTag, Accept, Shift, Reduce, GoTo };
+    enum Tag{ NoTag, Accept, Shift, Reduce };
     Tag tag = NoTag;
 
-    int no;
+    char no;
 
+    Item(){}
     Item(Tag t, int n): tag(t), no(n) {}
     Item(Tag t): tag(t) { no = -1;}
+    Item(char n): no(n) { tag = NoTag; }
 };
 
+class Rule {
+public:
+    int length;
+    char lhs;
 
-void init_parsing_table(std::map<char, std::map<char, Item*> > &parsing_table) {
+    Rule(int l, char lhs): length(l), lhs(lhs){}
+};
 
-    Item *S3 = new Item(Item::Tag::Shift, 3);
-    Item *S5 = new Item(Item::Tag::Shift, 5);
-    Item *S7 = new Item(Item::Tag::Shift, 7);
+void init_parsing_table(std::map<char, std::map<char, Item*> > &parsing_table, std::map<char, Rule*> &rules) {
 
-    Item *R2 = new Item(Item::Tag::Reduce, 2);
-    Item *R3 = new Item(Item::Tag::Reduce, 3);
-    Item *R4 = new Item(Item::Tag::Reduce, 4);
-    Item *R5 = new Item(Item::Tag::Reduce, 5);
-    Item *R6 = new Item(Item::Tag::Reduce, 6);
-    Item *R7 = new Item(Item::Tag::Reduce, 7);
-    Item *R8 = new Item(Item::Tag::Reduce, 8);
+    printf("init\n");
+
+    rules['1'] = new Rule(1, 'X'); // X->S
+    rules['2'] = new Rule(3, 'S'); // S->ABC
+    rules['3'] = new Rule(1, 'A'); // A->a, TODO: length of a
+    rules['4'] = new Rule(0, 'A'); // A->epsilon
+    rules['5'] = new Rule(2, 'B'); // B->bB, TODO: length of b -> 1?
+    rules['6'] = new Rule(0, 'B'); // B->epsilon
+    rules['7'] = new Rule(1, 'C'); // C->c, TODO:length of c
+    rules['8'] = new Rule(0, 'C'); // C->epsilon
+
+    printf("rules[1]->len, lhs %d, %c\n", rules['1']->length, rules['1']->lhs);
+
+    Item *S3 = new Item(Item::Tag::Shift, '3');
+    Item *S5 = new Item(Item::Tag::Shift, '5');
+    Item *S7 = new Item(Item::Tag::Shift, '7');
+
+    Item *R2 = new Item(Item::Tag::Reduce, '2');
+    Item *R3 = new Item(Item::Tag::Reduce, '3');
+    Item *R4 = new Item(Item::Tag::Reduce, '4');
+    Item *R5 = new Item(Item::Tag::Reduce, '5');
+    Item *R6 = new Item(Item::Tag::Reduce, '6');
+    Item *R7 = new Item(Item::Tag::Reduce, '7');
+    Item *R8 = new Item(Item::Tag::Reduce, '8');
 
     Item *accept = new Item(Item::Tag::Accept);
 
-    Item *goto1 = new Item(Item::Tag::GoTo, 1);
-    Item *goto2 = new Item(Item::Tag::GoTo, 2);
-    Item *goto4 = new Item(Item::Tag::GoTo, 4);
-    Item *goto6 = new Item(Item::Tag::GoTo, 6);
-    Item *goto8 = new Item(Item::Tag::GoTo, 8);
+    Item *goto1 = new Item('1');
+    Item *goto2 = new Item('2');
+    Item *goto4 = new Item('4');
+    Item *goto6 = new Item('6');
+    Item *goto8 = new Item('8');
 
     // I0
     parsing_table['0']['a'] = S3;
@@ -250,17 +272,67 @@ void init_parsing_table(std::map<char, std::map<char, Item*> > &parsing_table) {
     //I8
     parsing_table['8']['c'] = R5;
     parsing_table['8']['$'] = R5;
-    
-    // [0, s_T] -> R4(3, 4)
-    // printf("[0,$]: %c, %c\n", parsing_table['0']['$']->tag, parsing_table['0']['$']->no);
+
+    printf("parsing_table['8']['c'] tag: %d, no: %c\n", parsing_table['8']['c']->tag, parsing_table['8']['c']->no);
 }
 
-struct file_macthed* matching_files(const char *filename, const std::map<int, std::map<int, Item*> >, const char *a, const char *c) {
+struct FileMatched* matching_files(const char *filename, std::map<char, std::map<char, Item*> > parsing_table, std::map<char, Rule*> rules) {
 
-    char *cur_char = filename;
-    struct FileMacthed *matched_file = new struct FileMatched;
+    char filename_with_dollar[strlen(filename)+2];
+    strcpy(filename_with_dollar, filename);
+    strcat(filename_with_dollar, "$");
 
-    //std::stack<char> 
+    char *cur_char = filename_with_dollar;
+
+    struct FileMatched *matched_file = new struct FileMatched;
+
+    std::stack<char> parsing_stack;
+    parsing_stack.push('$');
+
+    std::stack<char> visited_chars;
+
+    Item *cur_item;
+    printf("while loop starts\n");
+    while (!parsing_stack.empty()) {
+
+        char parsing_stack_top = parsing_stack.top();
+        printf("top: %c\n", parsing_stack_top);
+
+        if (parsing_stack_top == '$') {
+            parsing_stack_top = '0';
+        }
+
+        cur_item = parsing_table[parsing_stack_top][*cur_char];
+        switch (cur_item->tag) {
+
+            case Item::Accept: { printf("Matched %s successfully!!!\n", filename);  return nullptr; } break; //TODO: how about position
+            case Item::Shift:  { 
+                             visited_chars.push(*cur_char);
+                             parsing_stack.push(*cur_char);
+                             parsing_stack.push(cur_item->no); 
+                             cur_char++; 
+                         } break;
+            case Item::Reduce: {   // TODO: rule_len[cur_item->no]
+                             for (int i = 0; i < rules[cur_item->no]->length * 2; i++) {
+                                 parsing_stack.pop();
+                             }
+
+                             char top_after_pop = parsing_stack.top();
+                             if (top_after_pop == '$') {
+                                top_after_pop = '0';
+                            }
+                             // TODO: rule_lhs[cur_item->no]
+                             char lhs = rules[cur_item->no]->lhs;
+
+                             printf("top_after_pop: %c, lhs: %c\n", top_after_pop, lhs);
+                             parsing_stack.push(lhs);
+                             parsing_stack.push(parsing_table[top_after_pop][lhs]->no);
+                         } break;
+            default: assert(false && "stuck into unknown state");
+        }
+    }
+
+    return nullptr;
 }
 
 void find_files(const char *mydir, const char *old_name){
@@ -269,7 +341,7 @@ void find_files(const char *mydir, const char *old_name){
 	d = opendir(mydir);
 
 	if (d){
-		struct FileMacthed *fm = new FileMacthed;
+		struct FileMatched *fm = new FileMatched;
 
 		while ((dir = readdir(d)) != NULL){
 			fm = match_filename(old_name, dir->d_name);
@@ -293,7 +365,7 @@ void find_files(const char *mydir, const char *old_name){
 	}
 }
 
-char *construct_new_name(FileMacthed fm, const char *new_name){
+char *construct_new_name(FileMatched fm, const char *new_name){
 
 	const char *c = new_name;
 	int s = 0;
@@ -421,7 +493,7 @@ int main(int argc, char *argv[]){
 	char o[20];
 	char f[20];
 
-	FileMacthed *fm = new FileMacthed;
+	FileMatched *fm = new FileMatched;
 	while (1) {
 		scanf("%s %s", o, f);
 		fm = match_filename(o, f);
@@ -440,9 +512,14 @@ int main(int argc, char *argv[]){
 
 	rename_files(cflag, c);
     */
+    printf("main\n");
 
     std::map<char, std::map<char, Item*> > parsing_table;
-    init_parsing_table(parsing_table);
+    std::map<char, Rule*> rules;
+
+    init_parsing_table(parsing_table, rules);
+
+    struct FileMatched *fm = matching_files("abbbbbbc", parsing_table, rules);
 
 	return 0;
 }	
