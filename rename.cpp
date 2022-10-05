@@ -99,13 +99,10 @@ struct Command parsing_command(int argc, char *argv[]){
 		return cmd;
 	}
 
-    printf("pos\n");
-
     const char *old_star_pos = strchr(cmd.old_name, '*');
     const char *new_star_pos = strchr(cmd.new_name, '*');
 
     if (old_star_pos) {
-        printf("found * in %s\n", cmd.old_name);
         int len_old_name = strlen(cmd.old_name);
         int len_pos = strlen(old_star_pos);
 
@@ -123,7 +120,6 @@ struct Command parsing_command(int argc, char *argv[]){
     }
 
     if (new_star_pos) {
-        printf("found * in new_name\n");
         int len_new_name = strlen(cmd.new_name);
         int len_pos = strlen(new_star_pos);
 
@@ -145,8 +141,6 @@ struct Command parsing_command(int argc, char *argv[]){
 }
 
 struct FileMatched* matching_files(const char *filename, const char *a, const char *c) {
-
-    printf("filename: %s, a: %s, c: %s\n", filename, a, c);
 
     struct FileMatched *matched_file = new struct FileMatched;
 
@@ -182,30 +176,23 @@ void find_files(const char *mydir, const char *a, const char *c){
 	struct dirent *dir;
 	d = opendir(mydir);
 
-    printf("mydir: %s\n", mydir);
-
     if (!d) {
         printf("No such directory!\n");
         return;
     }
-
+    
     struct FileMatched *fm = new FileMatched;
 
     while ((dir = readdir(d)) != NULL){
         fm = matching_files(dir->d_name, a, c);
         if (fm){
-            printf("%s\n", fm->filename);
             files_matched[fc++] = *fm;
         }
     }
 
     if (fc == 0){
         printf("No such files\n");
-    } else{
-        printf("Found ");
-        fc > 1 ? printf("%d files", fc) : printf("1 file");
-        printf(" as above\n");
-    }
+    } 
     delete fm;
 }
 
@@ -225,19 +212,19 @@ void preview(Command &cmd){
 
 	if (fc == 0) return;
 
-	printf("These changes would happen\n");
+	printf("\nThese changes would happen\n");
 	for (int i = 0; i < fc; i++){
 		const char *filename = files_matched[i].filename; 
 		const char *new_name = construct_new_name(files_matched[i], cmd);
 
-		printf("%s -> %s\n", filename, new_name);
+		printf("%-10s ->  %-15s\n", filename, new_name);
 	}
 }
 
 bool confirm(bool force_flag){
 	if (fc == 0) return 0;
 	if (force_flag)  return 1;
-	printf("do you want to rename all of these files? (y/n) ");
+	printf("\ndo you want to rename all of these files? (y/n) ");
 
 	char confirm_flag;
 	scanf("%c", &confirm_flag);
@@ -265,7 +252,6 @@ void rename_files(bool cflag, Command &cmd){
         strcpy(new_name_with_path, path);
         strcat(new_name_with_path, construct_new_name(files_matched[i], cmd));
 
-        printf("rename: %s -> %s\n", filename_with_path, new_name_with_path);
 		int r = rename(filename_with_path, new_name_with_path);
 		if (r) {
 			printf("failed to rename %s\n", filename_with_path);
@@ -283,17 +269,6 @@ int main(int argc, char *argv[]){
 
 	struct Command cmd = parsing_command(argc, argv);
 	
-    printf("cmd:\n");
-    printf("force_flag: %d\n", cmd.force_flag);
-    printf("show_help: %d\n", cmd.show_help);
-    printf("d: %s\n", cmd.d);
-    printf("old_name: %s\n", cmd.old_name);
-    printf("new_name: %s\n", cmd.new_name);
-    printf("old_a: %s\n", cmd.old_a);
-    printf("old_c: %s\n", cmd.old_c);
-    printf("new_a: %s\n", cmd.new_a);
-    printf("new_c: %s\n", cmd.new_c);
-
 	if (cmd.show_help){
 		print_usage();
 		return 0;
