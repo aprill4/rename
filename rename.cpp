@@ -5,289 +5,164 @@
 #include<stdio.h>
 #include<dirent.h>
 #include<string.h>
+#include<cstring>
 #include<sys/types.h>
-#include<map>
-#include<stack>
 
 //struct contains a string and 2 integers for position recording
 struct FileMatched{
 	const char *filename;
-	int star_begins = -1; 
-	int star_ends = -1;
+	int star_begins;
+	int star_length;
 } files_matched[50];
 
 int fc = 0;
 
-struct command{
+struct Command{
 	bool force_flag = 0;
 	bool show_help = 0;
-	bool error_occurs = 0;
 	const char *d = "."; 
-	char *old_name = NULL;
-	char *new_name = NULL;
+	const char *old_name = NULL;
+	const char *new_name = NULL;
+    const char *old_a;
+    const char *old_c;
+    const char *new_a;
+    const char *new_c;
 };
 
 void print_usage(){
 
 	printf("Usage: rename [OPTION]... [OLD_FILENAME] [NEW_FILENAME]\n");
 	printf("Rename old filename to new filename (the current directory by default).\n");
-	printf("\n");
-	printf("Options:\n");
+
+	printf("\nOptions:\n");
 	printf("    -f,\tforce to rename\n");
-	printf("    -d,\tspecify a directory, must be followed by a directory name\n");
+	printf("    -d,\tfollowed by a directory name to specify a directory\n");
 	printf("    -h,\tdisplay this help and exit\n");
 
-	printf("\nHINT:\ncan use \"*\" in filename to match any characters, but when using \"*\" remember to quote the filename and only one star can be matched.\n");
+	printf("\nHINT:\n");
+    printf("\t1. \"*\" in filename can match any characters, but remember to double quote the filename when using it and only one star can be used so far.\n");
+    printf("\t2. An old name must be followed by a new name!\n");
+
 }
 
-struct command* parsing_command(int argc, char *argv[]){
-	struct command *tmp = new struct command;
+
+struct Command parsing_command(int argc, char *argv[]){
+	struct Command cmd;
 	
 	if (argc == 1){
-		tmp->show_help = 1;
-		return tmp;
+		cmd.show_help = 1;
+		return cmd;
 	}
 
 	for (int i = 1; i < argc; i++){
 
-		if (strcmp(argv[i], "-h") == 0){
-			tmp->show_help = 1;
-			return tmp;
-		}
-		else if (strcmp(argv[i], "-f") == 0){
-			tmp->force_flag = 1;
+		if (!strcmp(argv[i], "-h")){
+			cmd.show_help = 1;
+			return cmd;
+
+		} else if (!strcmp(argv[i], "-f")){
+			cmd.force_flag = 1;
 			continue;
-		}
-		else if (strcmp(argv[i], "-d") == 0){
+
+		} else if (!strcmp(argv[i], "-d")){
 			if (!(i + 1 < argc)){
-				tmp->show_help = 1;
-				return tmp;
-			}
-			else if(!strcmp(argv[i+1], "-f") || !strcmp(argv[i+1], "-h")){
-					tmp->show_help = 1;
-					return tmp;
-			}
-			else{ 
-				tmp->d = argv[i+1];
+				cmd.show_help = 1;
+				return cmd;
+
+			} else if(!strcmp(argv[i+1], "-f") || !strcmp(argv[i+1], "-h")){
+					cmd.show_help = 1;
+					return cmd;
+
+			} else{ 
+				cmd.d = argv[i+1];
 				i++;
 				continue;
 			}
-		}
-		else {
-			tmp->old_name = argv[i];
+
+		} else {
+			cmd.old_name = argv[i];
 
 			if (i + 1 < argc) {
-				tmp->new_name = argv[i+1];
+				cmd.new_name = argv[i+1];
 				i++;
-			}
-			else{
-				tmp->error_occurs = 1;
-				printf("error, an old name must be followed by a new name\n");
-				return tmp;
+                continue;
+
+			} else{
+				cmd.show_help = 1;
+				return cmd;
 			}
 		}
 	}
 
-	if (tmp->old_name == NULL || tmp->new_name == NULL){
-		tmp -> show_help = 1;
-		return tmp;
+	if (cmd.old_name == NULL || cmd.new_name == NULL){
+		cmd.show_help = 1;
+		return cmd;
 	}
-	return tmp;
+
+    printf("pos\n");
+
+    const char *old_star_pos = strchr(cmd.old_name, '*');
+    const char *new_star_pos = strchr(cmd.new_name, '*');
+
+    if (old_star_pos) {
+        printf("found * in %s\n", cmd.old_name);
+        int len_old_name = strlen(cmd.old_name);
+        int len_pos = strlen(old_star_pos);
+
+        char *a = new char[len_old_name-len_pos];
+        // char a[len_old_name-len_pos];
+
+        strncpy(a, cmd.old_name, len_old_name-len_pos);
+        const char *c = (char *)old_star_pos + 1;
+        cmd.old_a = a;
+        cmd.old_c = c;
+
+    } else {
+        cmd.old_a = "";
+        cmd.old_c = "";
+    }
+
+    if (new_star_pos) {
+        printf("found * in new_name\n");
+        int len_new_name = strlen(cmd.new_name);
+        int len_pos = strlen(new_star_pos);
+
+        char *a = new char[len_new_name-len_pos];
+
+        //char a[len_new_name-len_pos];
+
+        strncpy(a, cmd.new_name, len_new_name-len_pos);
+        const char *c = (char *)new_star_pos + 1;
+        cmd.new_a = a;
+        cmd.new_c = c;
+
+    } else {
+        cmd.new_a = "";
+        cmd.new_c = "";
+    }
+    
+	return cmd;
 }
 
-// old silly method of matching files
-struct FileMatched* match_filename(const char *old_name, const char *filename){
-	const char* f = filename;
-	const char* o = old_name;
-	struct FileMatched *p = new struct FileMatched;
+struct FileMatched* matching_files(const char *filename, const char *a, const char *c) {
 
-	int s = 0;
-	while ( *o == *f  && *o != '\0' && *f != '\0'){
-		o++;
-		f++;
-		s++;
-	}
-	
-	if (*o != '\0') {
-		if (*o != '*') {
-			return NULL;
-		}
-
-		o++;
-
-		if (*f == '\0' && *o != '\0') return NULL;
-		if (*f == '\0' && *o == '\0') {
-			p -> filename = filename; 
-			p -> star_begins = s;
-			// star_begins = -1 and star_ends = -1
-			// which means each character of the filename was matched with the specified pattern
-		}
-		int c = 0;
-		int e = 0;
-		while (*f != '\0') {
-			if (c > 0){
-				if (*f == *o) {
-					f += 1;
-					if (*f == '\0') return NULL;
-					f -= c;
-				}
-				o -= c;
-				e += c;
-			}
-
-			while (*f != *o && *f != '\0') {
-				f++;
-				e++;
-			}
-			
-			if (*f == '\0' && *o != '\0') return NULL;
-			if (*f == '\0' && *o == '\0') {
-				p -> filename = filename;	
-				p -> star_begins = (s == 0) ? -1 : s; 
-				return p;
-			}
-
-			c = 0;
-			while (*f == *o && *(f+1) != '\0' && *(o+1) != '\0') {
-				f++;
-				o++;
-				c++;
-			}
-			if (*f == *o && *(f+1) == '\0' && *(o+1) == '\0') {
-				p -> filename = filename;
-				p -> star_begins = (s == 0) ? -1 : s; 
-				p -> star_ends = e;
-				return p;
-			}
-		}
-	}
-	if (*f != '\0') return NULL;
-	p -> filename = filename;
-	return p;
-}
-
-// A new and efficient algorithm based on CLR(1) to match files
-// S'->S
-// S->ABC
-// A->a|epsilon
-// B->bB|epsilon
-// C->c|epsilon
-
-// Parsing table
-class Item {
-public:
-    enum Tag{ NoTag, Accept, Shift, Reduce };
-    Tag tag;
-
-    char no;
-
-    Item() { no = -1; tag = NoTag; }
-    Item(Tag t, int n): tag(t), no(n) {}
-    Item(Tag t): tag(t) { no = -1;}
-    Item(char n): no(n) { tag = NoTag; }
-};
-
-class Rule {
-public:
-    int length;
-    char lhs;
-
-    Rule(int l, char lhs): length(l), lhs(lhs){}
-};
-
-void init_parsing_table(std::map<char, std::map<char, Item*> > &parsing_table, std::map<char, Rule*> &rules) {
-
-    rules['1'] = new Rule(1, 'X'); // X->S
-    rules['2'] = new Rule(3, 'S'); // S->ABC
-    rules['3'] = new Rule(1, 'A'); // A->a
-    rules['4'] = new Rule(0, 'A'); // A->epsilon
-    rules['5'] = new Rule(2, 'B'); // B->bB
-    rules['6'] = new Rule(0, 'B'); // B->epsilon
-    rules['7'] = new Rule(1, 'C'); // C->c
-    rules['8'] = new Rule(0, 'C'); // C->epsilon
-
-    Item *S3 = new Item(Item::Tag::Shift, '3');
-    Item *S5 = new Item(Item::Tag::Shift, '5');
-    Item *S7 = new Item(Item::Tag::Shift, '7');
-
-    Item *R2 = new Item(Item::Tag::Reduce, '2');
-    Item *R3 = new Item(Item::Tag::Reduce, '3');
-    Item *R4 = new Item(Item::Tag::Reduce, '4');
-    Item *R5 = new Item(Item::Tag::Reduce, '5');
-    Item *R6 = new Item(Item::Tag::Reduce, '6');
-    Item *R7 = new Item(Item::Tag::Reduce, '7');
-    Item *R8 = new Item(Item::Tag::Reduce, '8');
-
-    Item *accept = new Item(Item::Tag::Accept);
-
-    Item *goto1 = new Item('1');
-    Item *goto2 = new Item('2');
-    Item *goto4 = new Item('4');
-    Item *goto6 = new Item('6');
-    Item *goto8 = new Item('8');
-
-    // I0
-    parsing_table['0']['a'] = S3;
-    parsing_table['0']['b'] = R4;
-    parsing_table['0']['c'] = R4;
-    parsing_table['0']['$'] = R4;
-    parsing_table['0']['S'] = goto1;
-    parsing_table['0']['A'] = goto2;
-
-    //I1
-    parsing_table['1']['$'] = accept;
-
-    //I2
-    parsing_table['2']['b'] = S5;
-    parsing_table['2']['c'] = R6;
-    parsing_table['2']['$'] = R6;
-    parsing_table['2']['B'] = goto4;
-
-    //I3
-    parsing_table['3']['b'] = R3;
-    parsing_table['3']['c'] = R3;
-    parsing_table['3']['$'] = R3;
-
-    //I4
-    parsing_table['4']['c'] = S7;
-    parsing_table['4']['$'] = R8;
-    parsing_table['4']['C'] = goto6;
-
-    //I5
-    parsing_table['5']['b'] = S5;
-    parsing_table['5']['c'] = R6;
-    parsing_table['5']['$'] = R6;
-    parsing_table['5']['B'] = goto8;
-
-    //I6
-    parsing_table['6']['$'] = R2;
-
-    //I7
-    parsing_table['7']['$'] = R7;
-
-    //I8
-    parsing_table['8']['c'] = R5;
-    parsing_table['8']['$'] = R5;
-
-}
-
-struct FileMatched* matching_files(const char *filename, std::map<char, std::map<char, Item*> > parsing_table, std::map<char, Rule*> rules, const char *a, const char *c) {
+    printf("filename: %s, a: %s, c: %s\n", filename, a, c);
 
     struct FileMatched *matched_file = new struct FileMatched;
 
     int len_a = strlen(a);
     if (strncmp(a, filename, len_a)) {
-        printf("Failed to match %s\n", filename);
         return nullptr;
     }
 
     matched_file->star_begins = len_a;
+    matched_file->filename = filename;
 
     int len_filename = strlen(filename);
     int len_c = strlen(c);
 
     if (len_c == 0) {
-        matched_file->star_ends = len_filename;
+        matched_file->star_length = len_filename - len_a;
         return matched_file;
     }
 
@@ -298,251 +173,137 @@ struct FileMatched* matching_files(const char *filename, std::map<char, std::map
         return nullptr;
     }
 
-    matched_file->star_ends = star_ends;
+    matched_file->star_length = star_ends - matched_file->star_begins;
     return matched_file;
-
-    char filename_with_dollar[len_filename+2];
-    strcpy(filename_with_dollar, filename);
-    strcat(filename_with_dollar, "$");
-
-    char *cur_char = filename_with_dollar + len_a;
-
-
-    std::stack<char> parsing_stack;
-    parsing_stack.push('$');
-
-    Item *cur_item;
-    printf("while loop starts\n");
-    while (!parsing_stack.empty()) {
-
-        char parsing_stack_top = parsing_stack.top();
-        printf("top: %c\n", parsing_stack_top);
-
-        parsing_stack_top = (parsing_stack_top == '$') ?'0' :parsing_stack_top;
-        cur_item = parsing_table[parsing_stack_top][*cur_char];
-
-        if (!cur_item) {
-            printf("Failed to match %s\n", filename);
-            return nullptr;
-        }
-
-        // printf("cur_item no: %c, tag: %d\n", cur_item->no, cur_item->tag);
-
-        switch (cur_item->tag) {
-
-            case Item::Accept: { printf("Matched %s successfully!!!\n", filename);  return nullptr; } break; //TODO: how about position
-            case Item::Shift:  { 
-                             parsing_stack.push(*cur_char);
-                             parsing_stack.push(cur_item->no); 
-                             cur_char++; 
-                         } break;
-            case Item::Reduce: {   // TODO: rule_len[cur_item->no]
-                             for (int i = 0; i < rules[cur_item->no]->length * 2; i++) {
-                                 parsing_stack.pop();
-                             }
-
-                             char top_after_pop = parsing_stack.top();
-                             if (top_after_pop == '$') {
-                                top_after_pop = '0';
-                            }
-                             // TODO: rule_lhs[cur_item->no]
-                             char lhs = rules[cur_item->no]->lhs;
-
-                             printf("top_after_pop: %c, lhs: %c\n", top_after_pop, lhs);
-                             parsing_stack.push(lhs);
-                             parsing_stack.push(parsing_table[top_after_pop][lhs]->no);
-                         } break;
-            default: assert(false && "stuck into unknown state");
-        }
-    }
-
-    return nullptr;
 }
 
-void find_files(const char *mydir, const char *old_name){
+void find_files(const char *mydir, const char *a, const char *c){
 	DIR *d;
 	struct dirent *dir;
 	d = opendir(mydir);
 
-	if (d){
-		struct FileMatched *fm = new FileMatched;
+    printf("mydir: %s\n", mydir);
 
-		while ((dir = readdir(d)) != NULL){
-			fm = match_filename(old_name, dir->d_name);
-			if (fm != NULL){
-				printf("%s\n", fm->filename);
-				files_matched[fc++] = *fm;
-			}
-		}
-		if (fc == 0){
-			printf("No such files\n");
-		}
-		else{
-			printf("Found ");
-			fc > 1 ? printf("%d files", fc) : printf("1 file");
-			printf(" as above\n");
-		}
-		delete fm;
-	}
-	else{
-		printf("No such directory.\n");
-	}
+    if (!d) {
+        printf("No such directory!\n");
+        return;
+    }
+
+    struct FileMatched *fm = new FileMatched;
+
+    while ((dir = readdir(d)) != NULL){
+        fm = matching_files(dir->d_name, a, c);
+        if (fm){
+            printf("%s\n", fm->filename);
+            files_matched[fc++] = *fm;
+        }
+    }
+
+    if (fc == 0){
+        printf("No such files\n");
+    } else{
+        printf("Found ");
+        fc > 1 ? printf("%d files", fc) : printf("1 file");
+        printf(" as above\n");
+    }
+    delete fm;
 }
 
-char *construct_new_name(FileMatched fm, const char *new_name){
+char *construct_new_name(const FileMatched &fm, Command &cmd){
 
-	const char *c = new_name;
-	int s = 0;
-	int e = 0;
-	while (*c != '\0'){
-		if (*c == '*'){
-			e = s;
-			break;
-		}
-		else{
-			c++;
-			s++;
-		}
-	}
-	int star_begins = fm.star_begins;
-	star_begins = (star_begins == -1) ? 0 : star_begins;
-	int star_ends = fm.star_ends;
+	const char *star = fm.filename + fm.star_begins;
+	char *new_name = new char[50];
 
-	const char *star = fm.filename + star_begins;
-	char *c_new_name = new char[30];
-	char *t = c_new_name;
-	int i = 0;
-	while (i < s){
-		*t++ = *new_name++;
-		i++;
-	}
+    strcpy(new_name, cmd.new_a);
+    strncat(new_name, star, fm.star_length);
+    strcat(new_name, cmd.new_c);
 
-	if (e != 0){
-		if (star_ends != -1){
-			while (star_ends--){
-				*t++ = *star++;
-			}
-		}
-		else{
-			while (*star != '\0'){
-				*t++ = *star++;
-			}
-		}
-		const char *after_star = new_name + 1;
-		while (*after_star != '\0'){
-			*t++ = *after_star++;
-		}
-	}
-	*t= '\0';
-	return c_new_name;
+	return new_name;
 }
 
-void preview(command *cmd){
+void preview(Command &cmd){
 
 	if (fc == 0) return;
 
 	printf("These changes would happen\n");
 	for (int i = 0; i < fc; i++){
-		const char *c_new_name = construct_new_name(files_matched[i], cmd->new_name);
+		const char *filename = files_matched[i].filename; 
+		const char *new_name = construct_new_name(files_matched[i], cmd);
 
-		const char *final_filename = files_matched[i].filename; 
-		const char *final_new_name = c_new_name; 
-
-		printf("%s -> %s\n", final_filename, final_new_name);
+		printf("%s -> %s\n", filename, new_name);
 	}
 }
 
-bool confirm(bool fflag){
+bool confirm(bool force_flag){
 	if (fc == 0) return 0;
-	if (fflag)  return 1;
+	if (force_flag)  return 1;
 	printf("do you want to rename all of these files? (y/n) ");
 
 	char confirm_flag;
 	scanf("%c", &confirm_flag);
 	
-	if (confirm_flag == 'n') return 0;
-
-	return 1;
+    return confirm_flag == 'n'? 0: 1;
 }
 
-void rename_files(bool cflag, command *cmd){
+void rename_files(bool cflag, Command &cmd){
 	if (!cflag) return;
 
-	char *d = (char *)cmd->d;
 	char *path = new char[100];
-	path = strcpy(path, d);
+	path = strcpy(path, cmd.d);
 
-	while (*(d + 1)){ d++; }
-	if (*d != '/'){
-		path = strcat(path, "/");
-	}
+    if (path[strlen(path)-1] != '/') {
+        path = strcat(path, "/");
+    }
 
 	for (int i = 0; i < fc; i++){
-		const char *c_new_name = construct_new_name(files_matched[i], cmd->new_name);
+        
+		char *filename_with_path = new char[200];
+        strcpy(filename_with_path, path);
+        strcat(filename_with_path, files_matched[i].filename);
 
-		char *path_new_name = new char[100];
-		path_new_name = strcpy(path_new_name, path);
-		char *path_old_name = new char[100];
-		path_old_name = strcpy(path_old_name, path);
+		char *new_name_with_path = new char[200];
+        strcpy(new_name_with_path, path);
+        strcat(new_name_with_path, construct_new_name(files_matched[i], cmd));
 
-		const char *final_filename = strcat(path_old_name, files_matched[i].filename);
-		const char *final_new_name = strcat(path_new_name, c_new_name);
+        printf("rename: %s -> %s\n", filename_with_path, new_name_with_path);
+		int r = rename(filename_with_path, new_name_with_path);
+		if (r) {
+			printf("failed to rename %s\n", filename_with_path);
 
-		int r = rename(final_filename, final_new_name);
-		if (r != 0) {
-			printf("failed to rename %s\n", files_matched[i].filename);
+		} else {
+			printf("renamed %s successfully\n", filename_with_path);
 		}
-		else {
-			printf("renamed %s successfully\n", files_matched[i].filename);
-		}
-		delete []path_new_name;
-		delete []path_old_name;
+		delete []filename_with_path;
+		delete []new_name_with_path;
 	}
 	delete []path;
 } 
 
 int main(int argc, char *argv[]){
 
-    /*
-	struct command *c = parsing_command(argc, argv);
+	struct Command cmd = parsing_command(argc, argv);
 	
-	if (c->show_help){
+    printf("cmd:\n");
+    printf("force_flag: %d\n", cmd.force_flag);
+    printf("show_help: %d\n", cmd.show_help);
+    printf("d: %s\n", cmd.d);
+    printf("old_name: %s\n", cmd.old_name);
+    printf("new_name: %s\n", cmd.new_name);
+    printf("old_a: %s\n", cmd.old_a);
+    printf("old_c: %s\n", cmd.old_c);
+    printf("new_a: %s\n", cmd.new_a);
+    printf("new_c: %s\n", cmd.new_c);
+
+	if (cmd.show_help){
 		print_usage();
 		return 0;
 	}
-	else if (c->error_occurs){
-		return 0;
-	}
 
-	char o[20];
-	char f[20];
+	find_files(cmd.d, cmd.old_a, cmd.old_c);
+	preview(cmd);
+	bool cflag = confirm(cmd.force_flag);
 
-	FileMatched *fm = new FileMatched;
-	while (1) {
-		scanf("%s %s", o, f);
-		fm = match_filename(o, f);
-		if (fm != NULL){
-			printf("file matched: name: %s, star_begins: %d, star_ends: %d\n", fm->filename, fm->star_begins, fm->star_ends);
-			files_matched[0] = *fm;
-		}
-		else{
-			printf("no matched files\n");
-		}
-	}
-
-	find_files(c->d, c->old_name);
-	preview(c);
-	bool cflag = confirm(c->force_flag);
-
-	rename_files(cflag, c);
-    */
-
-    std::map<char, std::map<char, Item*> > parsing_table;
-    std::map<char, Rule*> rules;
-
-    init_parsing_table(parsing_table, rules);
-
-    struct FileMatched *fm = matching_files(argv[1], parsing_table, rules, "a", "c");
+	rename_files(cflag, cmd);
 
 	return 0;
 }	
