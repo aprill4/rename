@@ -1,284 +1,357 @@
 // $ clang++ -o # @ -std=c++11 -g
-//TODO: hope it can rename files with more stars
+// TODO: hope it can rename files with more stars
 
-#include<unistd.h>
-#include<stdio.h>
-#include<dirent.h>
-#include<string.h>
-#include<cstring>
-#include<sys/types.h>
+#include <cstring>
+#include <dirent.h>
+#include <map>
+#include <stdio.h>
+#include <string.h>
+#include <string>
+#include <sys/types.h>
+#include <unistd.h>
+#include <vector>
 
-//struct contains a string and 2 integers for position recording
-struct FileMatched{
-	const char *filename;
-	int star_begins;
-	int star_length;
-} files_matched[50];
-
-int fc = 0;
-
-struct Command{
-	bool force_flag = 0;
-	bool show_help = 0;
-	const char *d = "."; 
-	const char *old_name = NULL;
-	const char *new_name = NULL;
-    const char *old_a;
-    const char *old_c;
-    const char *new_a;
-    const char *new_c;
+// struct contains a string and 2 integers for position recording
+struct FileMatched {
+  const char *filename = nullptr;
+  const char *new_name = nullptr;
+  int star_begins = -1;
+  int star_length = -1;
 };
 
-void print_usage(){
+struct Command {
+  bool force_flag = 0;
+  bool show_help = 0;
+  const char *dir = ".";
+  const char *old_name = nullptr;
+  const char *new_name = nullptr;
+  const char *old_a = nullptr;
+  const char *old_c = nullptr;
+  const char *new_a = nullptr;
+  const char *new_c = nullptr;
+};
 
-	printf("Usage: rename [OPTION]... [OLD_FILENAME] [NEW_FILENAME]\n");
-	printf("Rename old filename to new filename (the current directory by default).\n");
+void print_usage() {
 
-	printf("\nOptions:\n");
-	printf("    -f,\tforce to rename\n");
-	printf("    -d,\tfollowed by a directory name to specify a directory\n");
-	printf("    -h,\tdisplay this help and exit\n");
+  printf("Usage: rename [OPTION]... [OLD_FILENAME] [NEW_FILENAME]\n");
+  printf("Rename old filename to new filename (the current directory by "
+         "default).\n");
 
-	printf("\nHINT:\n");
-    printf("\t1. \"*\" in filename can match any characters, but remember to double quote the filename when using it and only one star can be used so far.\n");
-    printf("\t2. An old name must be followed by a new name!\n");
+  printf("\nOptions:\n");
+  printf("    -f,\tforce to rename\n");
+  printf("    -d,\tfollowed by a directory name string specify a directory\n");
+  printf("    -h,\tdisplay this help and exit\n");
 
+  printf("\nHINT:\n");
+  printf("    1. \"*\" in filename can match any characters, but remember to "
+         "double quote the filename when using it and only one star can be "
+         "used so far.\n");
+  printf("    2. An old name must be followed by a new name!\n");
 }
 
+struct Command parse_command(int argc, char *argv[]) {
+  struct Command cmd;
 
-struct Command parsing_command(int argc, char *argv[]){
-	struct Command cmd;
-	
-	if (argc == 1){
-		cmd.show_help = 1;
-		return cmd;
-	}
+  if (argc == 1) {
+    cmd.show_help = 1;
+    return cmd;
+  }
 
-	for (int i = 1; i < argc; i++){
+  for (int i = 1; i < argc; i++) {
 
-		if (!strcmp(argv[i], "-h")){
-			cmd.show_help = 1;
-			return cmd;
+    if (!strcmp(argv[i], "-h")) {
+      cmd.show_help = 1;
+      return cmd;
 
-		} else if (!strcmp(argv[i], "-f")){
-			cmd.force_flag = 1;
-			continue;
+    } else if (!strcmp(argv[i], "-f")) {
+      cmd.force_flag = 1;
+      continue;
 
-		} else if (!strcmp(argv[i], "-d")){
-			if (!(i + 1 < argc)){
-				cmd.show_help = 1;
-				return cmd;
+    } else if (!strcmp(argv[i], "-d")) {
+      if (!(i + 1 < argc)) {
+        cmd.show_help = 1;
+        return cmd;
 
-			} else if(!strcmp(argv[i+1], "-f") || !strcmp(argv[i+1], "-h")){
-					cmd.show_help = 1;
-					return cmd;
+      } else if (!strcmp(argv[i + 1], "-f") || !strcmp(argv[i + 1], "-h")) {
+        cmd.show_help = 1;
+        return cmd;
 
-			} else{ 
-				cmd.d = argv[i+1];
-				i++;
-				continue;
-			}
-
-		} else {
-			cmd.old_name = argv[i];
-
-			if (i + 1 < argc) {
-				cmd.new_name = argv[i+1];
-				i++;
-                continue;
-
-			} else{
-				cmd.show_help = 1;
-				return cmd;
-			}
-		}
-	}
-
-	if (cmd.old_name == NULL || cmd.new_name == NULL){
-		cmd.show_help = 1;
-		return cmd;
-	}
-
-    const char *old_star_pos = strchr(cmd.old_name, '*');
-    const char *new_star_pos = strchr(cmd.new_name, '*');
-
-    if (old_star_pos) {
-        int len_old_name = strlen(cmd.old_name);
-        int len_pos = strlen(old_star_pos);
-
-        char *a = new char[len_old_name-len_pos];
-        // char a[len_old_name-len_pos];
-
-        strncpy(a, cmd.old_name, len_old_name-len_pos);
-        const char *c = (char *)old_star_pos + 1;
-        cmd.old_a = a;
-        cmd.old_c = c;
+      } else {
+        cmd.dir = argv[i + 1];
+        i++;
+        continue;
+      }
 
     } else {
-        cmd.old_a = "";
-        cmd.old_c = "";
+      cmd.old_name = argv[i];
+
+      if (i + 1 < argc) {
+        cmd.new_name = argv[i + 1];
+        i++;
+        continue;
+
+      } else {
+        cmd.show_help = 1;
+        return cmd;
+      }
     }
+  }
 
-    if (new_star_pos) {
-        int len_new_name = strlen(cmd.new_name);
-        int len_pos = strlen(new_star_pos);
+  if (!cmd.old_name || !cmd.new_name) {
+    cmd.show_help = 1;
+    return cmd;
+  }
 
-        char *a = new char[len_new_name-len_pos];
-
-        //char a[len_new_name-len_pos];
-
-        strncpy(a, cmd.new_name, len_new_name-len_pos);
-        const char *c = (char *)new_star_pos + 1;
-        cmd.new_a = a;
-        cmd.new_c = c;
-
-    } else {
-        cmd.new_a = "";
-        cmd.new_c = "";
-    }
-    
-	return cmd;
+  return cmd;
 }
 
-struct FileMatched* matching_files(const char *filename, const char *a, const char *c) {
+struct FileMatched *match_files(const char *filename, const char *pattern) {
 
-    struct FileMatched *matched_file = new struct FileMatched;
+  struct FileMatched *matched_file = new struct FileMatched;
 
-    int len_a = strlen(a);
-    if (strncmp(a, filename, len_a)) {
-        return nullptr;
+  const char *star_pos = strchr(pattern, '*');
+
+  if (!star_pos) {
+    if (!strcmp(filename, pattern)) {
+      matched_file->filename = filename;
+      return matched_file;
+
+    } else {
+      return nullptr;
     }
+  }
 
-    matched_file->star_begins = len_a;
-    matched_file->filename = filename;
+  size_t len_filename = strlen(filename);
+  size_t a = len_filename - strlen(star_pos);
+  size_t c = strlen(star_pos) - 1;
 
-    int len_filename = strlen(filename);
-    int len_c = strlen(c);
+  if (strncmp(pattern, filename, a)) {
+    return nullptr;
+  }
 
-    if (len_c == 0) {
-        matched_file->star_length = len_filename - len_a;
-        return matched_file;
-    }
+  matched_file->star_begins = a;
+  matched_file->filename = filename;
 
-    int star_ends = len_filename - len_c;
-    char *last_len_c_chars = (char *)filename + star_ends; 
 
-    if (strncmp(c, last_len_c_chars, len_c)) {
-        return nullptr;
-    }
-
-    matched_file->star_length = star_ends - matched_file->star_begins;
+  if (c == 0) {
+    matched_file->star_length = len_filename - a;
     return matched_file;
+  }
+
+  size_t star_ends = len_filename - c;
+
+  if (strncmp(filename + star_ends, pattern + a + 1, c)) {
+    return nullptr;
+  }
+
+  matched_file->star_length = star_ends - matched_file->star_begins;
+  return matched_file;
 }
 
-void find_files(const char *mydir, const char *a, const char *c){
-	DIR *d;
-	struct dirent *dir;
-	d = opendir(mydir);
+std::pair<int, std::vector<struct FileMatched> > find_files(const char *mydir,
+                                                           const char *pattern) {
+  DIR *d;
+  struct dirent *dir;
+  d = opendir(mydir);
 
-    if (!d) {
-        printf("No such directory!\n");
-        return;
-    }
-    
-    struct FileMatched *fm = new FileMatched;
+  std::vector<FileMatched> matched_files;
 
-    while ((dir = readdir(d)) != NULL){
-        fm = matching_files(dir->d_name, a, c);
-        if (fm){
-            files_matched[fc++] = *fm;
-        }
-    }
+  if (!d) {
+    // printf("No such directory!\n");
+    return std::make_pair(-1, matched_files);
+  }
 
-    if (fc == 0){
-        printf("No such files\n");
-    } 
-    delete fm;
-}
+  struct FileMatched *fm;
 
-char *construct_new_name(const FileMatched &fm, Command &cmd){
-
-	const char *star = fm.filename + fm.star_begins;
-	char *new_name = new char[50];
-
-    strcpy(new_name, cmd.new_a);
-    strncat(new_name, star, fm.star_length);
-    strcat(new_name, cmd.new_c);
-
-	return new_name;
-}
-
-void preview(Command &cmd){
-
-	if (fc == 0) return;
-
-	printf("\nThese changes would happen\n");
-	for (int i = 0; i < fc; i++){
-		const char *filename = files_matched[i].filename; 
-		const char *new_name = construct_new_name(files_matched[i], cmd);
-
-		printf("%-10s ->  %-15s\n", filename, new_name);
-	}
-}
-
-bool confirm(bool force_flag){
-	if (fc == 0) return 0;
-	if (force_flag)  return 1;
-	printf("\ndo you want to rename all of these files? (y/n) ");
-
-	char confirm_flag;
-	scanf("%c", &confirm_flag);
-	
-    return confirm_flag == 'n'? 0: 1;
-}
-
-void rename_files(bool cflag, Command &cmd){
-	if (!cflag) return;
-
-	char *path = new char[100];
-	path = strcpy(path, cmd.d);
-
-    if (path[strlen(path)-1] != '/') {
-        path = strcat(path, "/");
+  while ((dir = readdir(d)) != NULL) {
+    // ignore . and ..
+    if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, "..")) {
+      continue;
     }
 
-	for (int i = 0; i < fc; i++){
-        
-		char *filename_with_path = new char[200];
-        strcpy(filename_with_path, path);
-        strcat(filename_with_path, files_matched[i].filename);
+    fm = match_files(dir->d_name, pattern);
+    if (fm) {
+      // printf("%s\n", fm->filename);
+      matched_files.push_back(*fm);
+      delete fm;
+    }
+  }
 
-		char *new_name_with_path = new char[200];
-        strcpy(new_name_with_path, path);
-        strcat(new_name_with_path, construct_new_name(files_matched[i], cmd));
+  if (matched_files.size() == 0) {
+    return make_pair(0, matched_files);
+    // printf("No such files\n");
+  }
 
-		int r = rename(filename_with_path, new_name_with_path);
-		if (r) {
-			printf("failed to rename %s\n", filename_with_path);
+  return make_pair(1, matched_files);
+}
 
-		} else {
-			printf("renamed %s successfully\n", filename_with_path);
-		}
-		delete []filename_with_path;
-		delete []new_name_with_path;
-	}
-	delete []path;
-} 
+bool exceptions_handler(int status_code) {
+  if (status_code == -1) {
+    printf("No such directory!\n");
+    return 0;
 
-int main(int argc, char *argv[]){
+  } else if (status_code == 0) {
+    printf("No such files\n");
+    return 0;
 
-	struct Command cmd = parsing_command(argc, argv);
-	
-	if (cmd.show_help){
-		print_usage();
-		return 0;
-	}
+  } else {
+    return 1;
+  }
+}
 
-	find_files(cmd.d, cmd.old_a, cmd.old_c);
-	preview(cmd);
-	bool cflag = confirm(cmd.force_flag);
+bool construct_new_name(std::vector<FileMatched> &matched_files, const char *new_name) {
 
-	rename_files(cflag, cmd);
+  const char *star_pos = strchr(new_name, '*');
 
-	return 0;
-}	
+  int files_count = matched_files.size();
+
+  if (!star_pos) {
+    if (files_count > 1) {
+      printf("Rename more than one files to a single name is dangerous!\n");
+      return false;
+
+    } else {
+      matched_files[0].new_name = new char[strlen(new_name) + 1];
+      strcpy((char *)matched_files[0].new_name, new_name);
+      return true;
+    }
+  }
+
+  for (int i = 0; i < files_count; i++) {
+
+    const char *star = matched_files[i].filename + matched_files[i].star_begins;
+
+    size_t len_a = strlen(new_name) - strlen(star_pos);
+    size_t len_c = strlen(star_pos) - 1;
+
+    matched_files[i].new_name = new char[len_a + len_c + matched_files[i].star_length + 1];
+
+    strncpy((char *)matched_files[i].new_name, new_name, len_a);
+    strncat((char *)matched_files[i].new_name, star, matched_files[i].star_length);
+    strncat((char *)matched_files[i].new_name, new_name + len_a + 1, len_c);
+  }
+
+  return true;
+}
+
+void preview(std::vector<FileMatched> &matched_files) {
+
+  int files_count = matched_files.size();
+
+  if (files_count == 0)
+    return;
+
+  printf("\nThese changes would happen\n");
+  for (int i = 0; i < files_count; i++) {
+    printf("%-10s ->  %-15s\n", matched_files[i].filename,
+           matched_files[i].new_name);
+  }
+  printf("\n");
+}
+
+bool confirm(bool force_flag, int files_count) {
+  if (files_count == 0)
+    return false;
+
+  if (force_flag)
+    return true;
+
+  char confirm_flag;
+
+  do {
+    printf("do you want to rename all of these files? (y/n) ");
+    while ((confirm_flag = getchar()) == '\n') {}
+
+    switch (confirm_flag) {
+    case 'y':
+      return true;
+    case 'n':
+      return false;
+    default:
+      continue;
+    }
+  } while (1);
+
+}
+
+int rename_files(std::vector<FileMatched> &matched_files,
+                  const char *dir) {
+  char *path;
+  if (dir[strlen(dir) - 1] != '/') {
+    path = new char[strlen(dir) + 2];
+    strcpy(path, dir);
+    strcat(path, "/");
+  } else {
+    path = new char[strlen(dir) + 1];
+    strcpy(path, dir);
+  }
+
+  int path_len = strlen(path);
+
+  int files_count = matched_files.size();
+  for (int i = 0; i < files_count; i++) {
+
+    int filename_len = strlen(matched_files[i].filename);
+    int new_name_len = strlen(matched_files[i].new_name);
+
+    char *filename_with_path = new char[filename_len + path_len + 1];
+    strcpy(filename_with_path, path);
+    strcat(filename_with_path, matched_files[i].filename);
+
+    char *new_name_with_path = new char[new_name_len + path_len + 1];
+    strcpy(new_name_with_path, path);
+    strcat(new_name_with_path, matched_files[i].new_name);
+
+    int r = rename(filename_with_path, new_name_with_path);
+
+    if (r) {
+      printf("failed to rename %s\n", filename_with_path);
+
+    } else {
+      printf("renamed %s successfully\n", filename_with_path);
+    }
+
+    delete[] filename_with_path;
+    delete[] new_name_with_path;
+  }
+
+  delete[] path;
+
+  return 1;
+}
+
+int main(int argc, char *argv[]) {
+
+  // const char *array[] = {"./rename", "rename.cpp", "rename.cpp"};
+  struct Command cmd = parse_command(argc, argv);
+
+  if (cmd.show_help) {
+    print_usage();
+    return 0;
+  }
+
+  std::pair<int, std::vector<FileMatched> > result;
+  result = find_files(cmd.dir, cmd.old_name);
+
+  if (!exceptions_handler(result.first)) {
+    return 0;
+  }
+
+  std::vector<FileMatched> matched_files = result.second;
+
+  if (!construct_new_name(matched_files, cmd.new_name)) {
+    return 0;
+  }
+
+  preview(matched_files);
+
+  if (confirm(cmd.force_flag, matched_files.size())) {
+
+    if (!rename_files(matched_files, cmd.dir)) {
+      return 0;
+    }
+  }
+
+
+  return 0;
+}
